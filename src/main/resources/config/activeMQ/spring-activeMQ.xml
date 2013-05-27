@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:jee="http://www.springframework.org/schema/jee"
+	xmlns:amq="http://activemq.apache.org/schema/core"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+		http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+		http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://www.springframework.org/schema/util
+		http://www.springframework.org/schema/util/spring-util-3.0.xsd
+		http://www.springframework.org/schema/jee
+		http://www.springframework.org/schema/jee/spring-jee-3.0.xsd
+		http://activemq.apache.org/schema/core
+		http://activemq.apache.org/schema/core/activemq-core-5.5.0.xsd">
+	
+	<!-- 
+		使用spring的listenerContainer 消息用持久化保存，服务器重启不会丢失
+		也可以配置在${ACTIVEMQ_HOME}/conf/activemq.xml内
+		消息的保存方式文件持久化和数据库持久化
+		此配置是文件持久化
+　　-->
+	<!-- Embedded ActiveMQ Broker -->
+	<amq:broker useJmx="false" persistent="true" >
+		<amq:persistenceAdapter>
+			<amq:amqPersistenceAdapter directory="amqdata" maxFileLength="30m"/>
+		</amq:persistenceAdapter>
+			<amq:transportConnectors>
+				<amq:transportConnector uri="vm://localhost:61616"/>
+			</amq:transportConnectors>
+	</amq:broker>
+	
+	
+	<!--ActiveMQ connectionFactory  -->
+	<amq:connectionFactory id="jmsConnectionFactory" brokerURL="vm://localhost:61616" />
+
+	<!-- 
+		QUEUE：　点对点
+		消息数据被持久化，每条消息都能被消费
+		没有监听QUEUE地址也能被消费，数据不会丢失
+		一对一的发布接受策略，保证数据完整
+	 -->
+	<amq:queue name="QUEUE" physicalName="JMS-QUEUE" />
+	
+	<!-- ConnectionFactory -->
+	<bean id="singleConnectionFactory" class="org.springframework.jms.connection.SingleConnectionFactory" destroy-method="destroy">
+		<property name="targetConnectionFactory" ref="jmsConnectionFactory"/>
+		<property name="clientId" value="client1" />
+	</bean>
+	
+	<!-- 添加事务 -->
+	<bean id="jmsTransactionManager" class="org.springframework.jms.connection.JmsTransactionManager" >
+		<property name="connectionFactory" ref="singleConnectionFactory"/>
+	</bean>
+	
+	<!--  Spring JmsTemplate config -->
+	<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+		<property name="connectionFactory" ref="singleConnectionFactory"/>
+		<property name="messageConverter" ref="defaultMessageConverter" />
+		<property name="sessionTransacted" value="true"/>
+	</bean>
+	
+	<!-- converter  -->
+	<bean id="defaultMessageConverter" class="com.tes.ebook.jms.CustomMessageConverter" />
+	
+	<!-- 生产消息配置 -->
+	<!-- POJO which send Message uses  Spring JmsTemplate -->
+	
+	<bean id="queueMessageProducer" class="com.tes.ebook.jms.QueueMessageProducer">
+		<property name="template" ref="jmsTemplate" />
+		<property name="destination" ref="QUEUE" />
+	</bean>
+	
+	<!-- 消费消息 配置 -->
+	<!--  Message Driven POJO (MDP) -->
+	<!-- consumer for queue -->
+	<bean id="queueConsumer" class="com.tes.ebook.jms.QueueConsumer"/>
+	
+	<bean id="queueListener" class="org.springframework.jms.listener.adapter.MessageListenerAdapter">
+		<constructor-arg ref="queueConsumer" />
+		<!--  指定消费消息的方法 -->
+		<property name="defaultListenerMethod" value="receive" />
+		<!-- custom MessageConverter define -->
+		<property name="messageConverter" ref="defaultMessageConverter" />
+	</bean>
+	
+	<bean id="queueListenerContainer" class="org.springframework.jms.listener.DefaultMessageListenerContainer">
+		<property name="connectionFactory" ref="jmsConnectionFactory" />
+		<property name="destination" ref="QUEUE" />
+		<property name="messageListener" ref="queueListener" />
+		<property name="transactionManager" ref="jmsTransactionManager"/>
+		<property name="sessionTransacted" value="true"/>
+		<property name="concurrentConsumers" value="5"/>
+	</bean>
+</beans>

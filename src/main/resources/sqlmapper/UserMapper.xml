@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.tes.ebook.mapper.UserMapper" >
+
+    <!-- 用于select查询公用抽取的列 -->
+    <sql id="Base_Column_List">
+    <![CDATA[
+    
+        id,
+   username,
+   password,
+   crtTime,
+   updTime
+        
+    ]]>
+    </sql>
+
+	<select id="getById" parameterType="String" resultType="user">
+		select 
+		<include refid="Base_Column_List"/>
+		from t_user 
+		where id=#{id}
+	</select>
+
+	<insert id="insert" parameterType="user">
+		<![CDATA[
+			insert into t_user (id,crt_time,
+		]]>
+		<trim prefixOverrides="," suffix=")">
+			<if test="@Ognl@isNotEmpty(username)">,username</if>
+			<if test="@Ognl@isNotEmpty(password)">,password</if>
+			
+		</trim>
+		<![CDATA[
+			 values (#{id},now(),
+		]]>
+		<trim prefixOverrides="," suffix=")">
+			<if test="@Ognl@isNotEmpty(username)">,#{username}</if>
+			<if test="@Ognl@isNotEmpty(password)">,#{password}</if>
+		</trim>
+
+	</insert>
+	
+	<delete id="delete" parameterType="Map">
+		delete from t_user
+		<where>
+			<if test="@Ognl@isNotEmpty(id)">AND id = #{id}</if>
+			<if test="@Ognl@isNotEmpty(username)">AND username = #{username}</if>
+		</where>
+	</delete>
+	
+	<update id="update" parameterType="user">
+		update t_user 
+		<trim prefix="set" prefixOverrides=",">
+			<if test="@Ognl@isNotEmpty(username)">,username=#{username}</if>
+			<if test="@Ognl@isNotEmpty(password)">,password=#{password}</if>
+		</trim>
+		<where>
+			id=#{id}
+		</where>
+	</update>
+	
+	<select id="getList" parameterType="user" resultType="user">
+		select <include refid="Base_Column_List"/>
+		from t_user
+		<where>
+			<if test="@Ognl@isNotEmpty(id)">AND id = #{id}</if>
+			<if test="@Ognl@isNotEmpty(username)">AND username = #{username}</if>
+		</where>
+		order by id
+	</select>
+	
+	<!-- 	分页查询 -->
+	<select id="getPageList" parameterType="Map" resultType="user">
+		select <include refid="Base_Column_List"/>
+		from t_user
+		<where>
+			<if test="@Ognl@isNotEmpty(id)">AND id = #{id}</if>
+			<if test="@Ognl@isNotEmpty(username)">AND username = #{username}</if>
+		</where>
+		limit #{startRow}, #{pageSize}
+	</select>
+	
+	<select id="getPageCount" parameterType="Map" resultType="int">
+		select count(1) 
+		from t_user
+		<where>
+			<if test="@Ognl@isNotEmpty(id)">AND id = #{id}</if>
+			<if test="@Ognl@isNotEmpty(username)">AND username = #{username}</if>
+		</where>
+	</select>
+</mapper>
+
